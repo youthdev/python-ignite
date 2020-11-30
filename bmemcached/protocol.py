@@ -87,11 +87,10 @@ class Protocol(threading.local):
     }
 
     FLAGS = {
-        'object': 1 << 0,
-        'integer': 1 << 1,
-        'long': 1 << 2,
-        'compressed': 1 << 3,
-        'binary': 1 << 4,
+        'object': 1 << 11,
+        'integer': 1 << 9 | 1 << 8,
+        'compressed': 1 << 13,
+        'binary': 1 << 12,
     }
 
     MAXIMUM_EXPIRE_TIME = 0xfffffffe
@@ -344,12 +343,9 @@ class Protocol(threading.local):
             flags |= self.FLAGS['binary']
         elif isinstance(value, text_type):
             value = value.encode('utf8')
-        elif isinstance(value, int) and isinstance(value, bool) is False:
+        elif (isinstance(value, int) or isinstance(value, long)) and isinstance(value, bool) is False:
             flags |= self.FLAGS['integer']
-            value = str(value)
-        elif isinstance(value, long) and isinstance(value, bool) is False:
-            flags |= self.FLAGS['long']
-            value = str(value)
+            value = value.to_bytes(8, 'big')
         else:
             flags |= self.FLAGS['object']
             buf = BytesIO()
@@ -357,17 +353,17 @@ class Protocol(threading.local):
             pickler.dump(value)
             value = buf.getvalue()
 
-        if compress_level != 0 and len(value) > self.COMPRESSION_THRESHOLD:
-            if compress_level is not None and compress_level > 0:
-                # Use the specified compression level.
-                compressed_value = self.compression.compress(value, compress_level)
-            else:
-                # Use the default compression level.
-                compressed_value = self.compression.compress(value)
-            # Use the compressed value only if it is actually smaller.
-            if compressed_value and len(compressed_value) < len(value):
-                value = compressed_value
-                flags |= self.FLAGS['compressed']
+            if compress_level != 0 and len(value) > self.COMPRESSION_THRESHOLD:
+                if compress_level is not None and compress_level > 0:
+                    # Use the specified compression level.
+                    compressed_value = self.compression.compress(value, compress_level)
+                else:
+                    # Use the default compression level.
+                    compressed_value = self.compression.compress(value)
+                # Use the compressed value only if it is actually smaller.
+                if compressed_value and len(compressed_value) < len(value):
+                    value = compressed_value
+                    flags |= self.FLAGS['compressed']
 
         return flags, value
 
@@ -391,9 +387,7 @@ class Protocol(threading.local):
             return value
 
         if flags & FLAGS['integer']:
-            return int(value)
-        elif flags & FLAGS['long']:
-            return long(value)
+            return int.from_bytes(value, 'big')
         elif flags & FLAGS['object']:
             buf = BytesIO(value)
             unpickler = self.unpickler(buf)
