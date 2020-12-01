@@ -1,7 +1,6 @@
 import six
 
-from bmemcached.client.constants import PICKLE_PROTOCOL, SOCKET_TIMEOUT
-from bmemcached.compat import pickle
+from bmemcached.client.constants import SOCKET_TIMEOUT
 from bmemcached.protocol import Protocol
 
 
@@ -16,14 +15,6 @@ class ClientMixin(object):
     :type password: six.string_types
     :param socket_timeout: The timeout applied to memcached connections.
     :type socket_timeout: float
-    :param pickle_protocol: The pickling protocol to use, 0-5. See
-        https://docs.python.org/3/library/pickle.html#data-stream-format
-        default is 0 (human-readable, original format).
-    :type pickle_protocol: int
-    :param pickler: Use this to replace the object serialization mechanism.
-    :type pickler: function
-    :param unpickler: Use this to replace the object deserialization mechanism.
-    :type unpickler: function
     :param tls_context: A TLS context in order to connect to TLS enabled
         memcached servers.
     :type tls_context: ssl.SSLContext
@@ -32,16 +23,10 @@ class ClientMixin(object):
                  username=None,
                  password=None,
                  socket_timeout=SOCKET_TIMEOUT,
-                 pickle_protocol=PICKLE_PROTOCOL,
-                 pickler=pickle.Pickler,
-                 unpickler=pickle.Unpickler,
                  tls_context=None):
         self.username = username
         self.password = password
         self.socket_timeout = socket_timeout
-        self.pickle_protocol = pickle_protocol
-        self.pickler = pickler
-        self.unpickler = unpickler
         self.tls_context = tls_context
         self.set_servers(servers)
 
@@ -68,9 +53,6 @@ class ClientMixin(object):
             username=self.username,
             password=self.password,
             socket_timeout=self.socket_timeout,
-            pickle_protocol=self.pickle_protocol,
-            pickler=self.pickler,
-            unpickler=self.unpickler,
             tls_context=self.tls_context,
         ) for server in servers]
 

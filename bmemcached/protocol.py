@@ -16,6 +16,7 @@ from six import binary_type, text_type
 from bmemcached.compat import long
 from bmemcached.exceptions import AuthenticationNotSupported, InvalidCredentials, MemcachedException
 from bmemcached.utils import str_to_bytes
+import jsonpickle
 
 
 logger = logging.getLogger(__name__)
@@ -97,8 +98,7 @@ class Protocol(threading.local):
 
     last_connectivity_test = 0
 
-    def __init__(self, server, username=None, password=None, socket_timeout=None,
-                 pickle_protocol=None, pickler=None, unpickler=None, tls_context=None):
+    def __init__(self, server, username=None, password=None, socket_timeout=None, tls_context=None):
         super(Protocol, self).__init__()
         self.server = server
         self._username = username
@@ -107,9 +107,6 @@ class Protocol(threading.local):
         self.connection = None
         self.authenticated = False
         self.socket_timeout = socket_timeout
-        self.pickle_protocol = pickle_protocol
-        self.pickler = pickler
-        self.unpickler = unpickler
         self.tls_context = tls_context
 
         self.reconnects_deferred_until = None
@@ -343,17 +340,11 @@ class Protocol(threading.local):
         flags = 0
         if isinstance(value, binary_type):
             flags |= self.FLAGS['binary']
-        elif isinstance(value, text_type):
-            value = value.encode('utf8')
         elif (isinstance(value, int) or isinstance(value, long)) and isinstance(value, bool) is False:
             flags |= self.FLAGS['integer']
             value = value.to_bytes(8, 'big')
         else:
-            flags |= self.FLAGS['object']
-            buf = BytesIO()
-            pickler = self.pickler(buf, self.pickle_protocol)
-            pickler.dump(value)
-            value = buf.getvalue()
+            value = jsonpickle.encode(value).encode('utf8')
 
         return flags, value
 
@@ -375,10 +366,8 @@ class Protocol(threading.local):
 
         if flags & FLAGS['integer']:
             return int.from_bytes(value, 'big')
-        elif flags & FLAGS['object']:
-            buf = BytesIO(value)
-            unpickler = self.unpickler(buf)
-            return unpickler.load()
+
+        value = jsonpickle.decode(value)
 
         if six.PY3:
             return value.decode('utf8')
