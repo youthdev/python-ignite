@@ -650,6 +650,9 @@ class Protocol(threading.local):
         mappings = list(mappings.items())
         msg = []
 
+        time = time * 1000  # Workaround for ignite different time unit
+        time = time if time >= 0 else self.MAXIMUM_EXPIRE_TIME
+
         for opaque, (key, value) in enumerate(mappings):
             if isinstance(key, tuple):
                 key, cas = key
@@ -718,6 +721,7 @@ class Protocol(threading.local):
         :rtype: int
         """
         keybytes = str_to_bytes(key)
+        time = time * 1000  # Workaround for ignite different time unit
         time = time if time >= 0 else self.MAXIMUM_EXPIRE_TIME
         self._send(struct.pack(self.HEADER_STRUCT +
                                self.COMMANDS[command]['struct'] % len(key),
