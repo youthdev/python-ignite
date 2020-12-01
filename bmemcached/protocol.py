@@ -367,10 +367,8 @@ class Protocol(threading.local):
         if flags & FLAGS['integer']:
             return int.from_bytes(value, 'big')
 
-        value = jsonpickle.decode(value)
-
         if six.PY3:
-            return value.decode('utf8')
+            return jsonpickle.decode(value.decode('utf8'))
 
         # In Python 2, mimic the behavior of the json library: return a str
         # unless the value contains unicode characters.
@@ -379,11 +377,11 @@ class Protocol(threading.local):
             value.decode('ascii')
         except UnicodeDecodeError:
             try:
-                return value.decode('utf8')
+                return jsonpickle.decode(value.decode('utf8'))
             except UnicodeDecodeError:
-                return value
+                return jsonpickle.decode(value)
         else:
-            return value
+            return jsonpickle.decode(value)
 
     def get(self, key):
         """
