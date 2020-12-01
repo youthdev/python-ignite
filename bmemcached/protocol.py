@@ -94,7 +94,7 @@ class Protocol(threading.local):
 
     MAXIMUM_EXPIRE_TIME = 0xfffffffe
 
-    CONNECTIVITY_TEST_EVERY_SECONDS = 30
+    CONNECTIVITY_TEST_EVERY_SECONDS = 5
 
     last_connectivity_test = 0
 
