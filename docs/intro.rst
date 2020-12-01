@@ -10,6 +10,11 @@ the remaining data types will be serialized internally by Python pickler.
 Currently, this repo is here due to internal purposes of https://doopage.com and https://youthdev.net and we provide no guarantee of keeping upgrading or developing this library.
 So please consider carefully and fork this repo to your account if needed. However, issue reported is welcome and we will try to allocate our resource to fix it in mean time.
 
+This repo is well tested and is running for https://doopage.com which aim to be a replacement for python-binary-memcached library but work with Apache Ignite only.
+There is no code changes needed for the replacement.
+
+Notice: This library can not work with Memcached backend anymore due to difference in expiry time unit (Ignite use milisecond while Memcached backend is second).
+
 
 Introduction to bmemcached
 ==========================
@@ -26,7 +31,7 @@ Use pip or easy_install.
 
 .. code-block:: bash
 
-    pip install python-binary-memcached
+    pip install https://github.com/youthdev/python-bmemcached-ignite/archive/master.zip
 
 Using
 -----
