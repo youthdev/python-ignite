@@ -11,10 +11,10 @@ class DistributedClient(ClientMixin):
 
     It tries to distribute keys over the specified servers using `HashRing` consistent hash.
     """
-    def __init__(self, servers=('127.0.0.1:11211',), username=None, password=None, compression=None,
+    def __init__(self, servers=('127.0.0.1:11211',), username=None, password=None,
                  socket_timeout=SOCKET_TIMEOUT, pickle_protocol=0, pickler=pickle.Pickler, unpickler=pickle.Unpickler,
                  tls_context=None):
-        super(DistributedClient, self).__init__(servers, username, password, compression, socket_timeout,
+        super(DistributedClient, self).__init__(servers, username, password, socket_timeout,
                                                 pickle_protocol, pickler, unpickler, tls_context)
         self._ring = HashRing(self._servers)
 
@@ -39,7 +39,7 @@ class DistributedClient(ClientMixin):
             servers[server_key].append(key)
         return all([server.delete_multi(keys_) for server, keys_ in servers.items()])
 
-    def set(self, key, value, time=0, compress_level=-1):
+    def set(self, key, value, time=0):
         """
         Set a value for a key on server.
 
@@ -49,17 +49,13 @@ class DistributedClient(ClientMixin):
         :type value: object
         :param time: Time in seconds that your key will expire.
         :type time: int
-        :param compress_level: How much to compress.
-            0 = no compression, 1 = fastest, 9 = slowest but best,
-            -1 = default compression level.
-        :type compress_level: int
         :return: True in case of success and False in case of failure
         :rtype: bool
         """
         server = self._get_server(key)
-        return server.set(key, value, time, compress_level)
+        return server.set(key, value, time)
 
-    def set_multi(self, mappings, time=0, compress_level=-1):
+    def set_multi(self, mappings, time=0):
         """
         Set multiple keys with it's values on server.
 
@@ -67,10 +63,6 @@ class DistributedClient(ClientMixin):
         :type mappings: dict
         :param time: Time in seconds that your key will expire.
         :type time: int
-        :param compress_level: How much to compress.
-            0 = no compression, 1 = fastest, 9 = slowest but best,
-            -1 = default compression level.
-        :type compress_level: int
         :return: List of keys that failed to be set on any server.
         :rtype: list
         """
@@ -82,11 +74,11 @@ class DistributedClient(ClientMixin):
             server_key = self._get_server(key)
             server_mappings[server_key].update([(key, value)])
         for server, m in server_mappings.items():
-            returns |= set(server.set_multi(m, time, compress_level))
+            returns |= set(server.set_multi(m, time))
 
         return list(returns)
 
-    def add(self, key, value, time=0, compress_level=-1):
+    def add(self, key, value, time=0):
         """
         Add a key/value to server ony if it does not exist.
 
@@ -96,17 +88,13 @@ class DistributedClient(ClientMixin):
         :type value: object
         :param time: Time in seconds that your key will expire.
         :type time: int
-        :param compress_level: How much to compress.
-            0 = no compression, 1 = fastest, 9 = slowest but best,
-            -1 = default compression level.
-        :type compress_level: int
         :return: True if key is added False if key already exists
         :rtype: bool
         """
         server = self._get_server(key)
-        return server.add(key, value, time, compress_level)
+        return server.add(key, value, time)
 
-    def replace(self, key, value, time=0, compress_level=-1):
+    def replace(self, key, value, time=0):
         """
         Replace a key/value to server ony if it does exist.
 
@@ -116,15 +104,11 @@ class DistributedClient(ClientMixin):
         :type value: object
         :param time: Time in seconds that your key will expire.
         :type time: int
-        :param compress_level: How much to compress.
-            0 = no compression, 1 = fastest, 9 = slowest but best,
-            -1 = default compression level.
-        :type compress_level: int
         :return: True if key is replace False if key does not exists
         :rtype: bool
         """
         server = self._get_server(key)
-        return server.replace(key, value, time, compress_level)
+        return server.replace(key, value, time)
 
     def get(self, key, default=None, get_cas=False):
         """
@@ -182,7 +166,7 @@ class DistributedClient(ClientMixin):
         server = self._get_server(key)
         return server.get(key)
 
-    def cas(self, key, value, cas, time=0, compress_level=-1):
+    def cas(self, key, value, cas, time=0):
         """
         Set a value for a key on server if its CAS value matches cas.
 
@@ -194,15 +178,11 @@ class DistributedClient(ClientMixin):
         :type cas: int
         :param time: Time in seconds that your key will expire.
         :type time: int
-        :param compress_level: How much to compress.
-            0 = no compression, 1 = fastest, 9 = slowest but best,
-            -1 = default compression level.
-        :type compress_level: int
         :return: True in case of success and False in case of failure
         :rtype: bool
         """
         server = self._get_server(key)
-        return server.cas(key, value, cas, time, compress_level)
+        return server.cas(key, value, cas, time)
 
     def incr(self, key, value):
         """

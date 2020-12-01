@@ -14,10 +14,6 @@ class ClientMixin(object):
     :type username: six.string_types
     :param password: If your server requires SASL authentication, provide the password.
     :type password: six.string_types
-    :param compression: This memcached client uses zlib compression by default,
-        but you can change it to any Python module that provides
-        `compress` and `decompress` functions, such as `bz2`.
-    :type compression: Python module
     :param socket_timeout: The timeout applied to memcached connections.
     :type socket_timeout: float
     :param pickle_protocol: The pickling protocol to use, 0-5. See
@@ -35,7 +31,6 @@ class ClientMixin(object):
     def __init__(self, servers=('127.0.0.1:11211',),
                  username=None,
                  password=None,
-                 compression=None,
                  socket_timeout=SOCKET_TIMEOUT,
                  pickle_protocol=PICKLE_PROTOCOL,
                  pickler=pickle.Pickler,
@@ -43,7 +38,6 @@ class ClientMixin(object):
                  tls_context=None):
         self.username = username
         self.password = password
-        self.compression = compression
         self.socket_timeout = socket_timeout
         self.pickle_protocol = pickle_protocol
         self.pickler = pickler
@@ -73,7 +67,6 @@ class ClientMixin(object):
             server=server,
             username=self.username,
             password=self.password,
-            compression=self.compression,
             socket_timeout=self.socket_timeout,
             pickle_protocol=self.pickle_protocol,
             pickler=self.pickler,
@@ -132,19 +125,19 @@ class ClientMixin(object):
     def get_multi(self, keys, get_cas=False):
         raise NotImplementedError()
 
-    def set(self, key, value, time=0, compress_level=-1):
+    def set(self, key, value, time=0):
         raise NotImplementedError()
 
-    def cas(self, key, value, cas, time=0, compress_level=-1):
+    def cas(self, key, value, cas, time=0):
         raise NotImplementedError()
 
-    def set_multi(self, mappings, time=0, compress_level=-1):
+    def set_multi(self, mappings, time=0):
         raise NotImplementedError()
 
-    def add(self, key, value, time=0, compress_level=-1):
+    def add(self, key, value, time=0):
         raise NotImplementedError()
 
-    def replace(self, key, value, time=0, compress_level=-1):
+    def replace(self, key, value, time=0):
         raise NotImplementedError()
 
     def delete(self, key, cas=0):  # type: (six.string_types, int) -> bool
