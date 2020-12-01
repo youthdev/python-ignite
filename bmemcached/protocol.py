@@ -87,9 +87,8 @@ class Protocol(threading.local):
     }
 
     FLAGS = {
-        'object': 1 << 11,
         'integer': 1 << 9 | 1 << 8,
-        'binary': 1 << 12,
+        'binary': 1 << 11,
     }
 
     MAXIMUM_EXPIRE_TIME = 0xfffffffe
