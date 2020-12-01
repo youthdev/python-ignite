@@ -28,5 +28,6 @@ setup(
     install_requires=[
         'six',
         'uhashring',
+        'jsonpickle'
     ]
 )
