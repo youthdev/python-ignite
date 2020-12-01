@@ -533,6 +533,7 @@ class Protocol(threading.local):
         :return: True in case of success and False in case of failure
         :rtype: bool
         """
+        time = time * 1000  # Ignite use miliseconds while memcached protocol is in second
         time = time if time >= 0 else self.MAXIMUM_EXPIRE_TIME
         logger.debug('Setting/adding/replacing key %s.', key)
         flags, value = self.serialize(value)
