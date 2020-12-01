@@ -237,18 +237,18 @@ class Protocol(threading.local):
             return (self.MAGIC['response'], -1, 0, 0, 0, self.STATUS['server_disconnected'], 0, 0, 0, message)
 
     def _send(self, data):
-		# retry sending twice on socket error to reopen new connection in case of server closed the client connection
-		for i in range(0, 2):
-			try:
-				self._open_connection()
-				if self.connection is None:
-					return
+        # retry sending twice on socket error to reopen new connection in case of server closed the client connection
+        for i in range(0, 2):
+            try:
+                self._open_connection()
+                if self.connection is None:
+                    return
 
-				self.connection.sendall(data)
-			except socket.error as e:
-				self._connection_error(e)
-				continue
-			break
+                self.connection.sendall(data)
+            except socket.error as e:
+                self._connection_error(e)
+                continue
+            break
 
     def authenticate(self, username, password):
         """
