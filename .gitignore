@@ -16,3 +16,4 @@ pyvenv.cfg
 share
 _build
 dist
+.idea/
