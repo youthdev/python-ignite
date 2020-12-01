@@ -93,6 +93,10 @@ class Protocol(threading.local):
 
     MAXIMUM_EXPIRE_TIME = 0xfffffffe
 
+    CONNECTIVITY_TEST_EVERY_SECONDS = 30
+
+    last_connectivity_test = 0
+
     def __init__(self, server, username=None, password=None, socket_timeout=None,
                  pickle_protocol=None, pickler=None, unpickler=None, tls_context=None):
         super(Protocol, self).__init__()
@@ -236,19 +240,22 @@ class Protocol(threading.local):
             message = str(e)
             return (self.MAGIC['response'], -1, 0, 0, 0, self.STATUS['server_disconnected'], 0, 0, 0, message)
 
-    def _send(self, data):
-        # retry sending twice on socket error to reopen new connection in case of server closed the client connection
-        for i in range(0, 2):
-            try:
-                self._open_connection()
-                if self.connection is None:
-                    return
+    def _send(self, data, test_connectivity=True):
+        if test_connectivity:
+            if self.last_connectivity_test < datetime.now().timestamp() - self.CONNECTIVITY_TEST_EVERY_SECONDS:
+                self.last_connectivity_test = datetime.now().timestamp()
+                # noop command will auto release connection to the server if current connection is closed,
+                # so next self._open_connection() will reopen a new one
+                self.noop()
 
-                self.connection.sendall(data)
-            except socket.error as e:
-                self._connection_error(e)
-                continue
-            break
+        try:
+            self._open_connection()
+            if self.connection is None:
+                return
+
+            self.connection.sendall(data)
+        except socket.error as e:
+            self._connection_error(e)
 
     def authenticate(self, username, password):
         """
@@ -441,7 +448,7 @@ class Protocol(threading.local):
                            self.MAGIC['request'],
                            self.COMMANDS['noop']['command'],
                            0, 0, 0, 0, 0, 0, 0)
-        self._send(data)
+        self._send(data, False)
 
         (magic, opcode, keylen, extlen, datatype, status, bodylen, opaque,
          cas, extra_content) = self._get_response()
