@@ -1,3 +1,16 @@
+Disclamation
+==========================
+
+This is an workaround solution to adjust the bmemcached to be workable with Apache Ignite (tested with 2.5.0).
+Apache Ignite does not compatible with the client library that try to use extra flags for internal purpose 
+and unfortunately, most of memcached binary client library use it for saving the data type or compression mode and so on.
+So this repo adjust the extra flags of original bmemcached library to fit with Ignite extra flags for some data types,
+the remaining data types will be serialized internally by Python pickler.
+
+Currently, this repo is here due to internal purposes of https://doopage.com and https://youthdev.net and we provide no guarantee of keeping upgrading or developing this library.
+So please consider carefully and fork this repo to your account if needed. However, issue reported is welcome and we will try to allocate our resource to fix it in mean time.
+
+
 Introduction to bmemcached
 ==========================
 
