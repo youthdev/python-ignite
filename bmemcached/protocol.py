@@ -80,6 +80,7 @@ class Protocol(threading.local):
         'key_exists': 0x02,
         'auth_error': 0x08,
         'unknown_command': 0x81,
+        'failure': 0x04,
 
         # This is used internally, and is never returned by the server.  (The server returns a 16-bit
         # value, so it's not capable of returning this value.)
@@ -539,11 +540,8 @@ class Protocol(threading.local):
          cas, extra_content) = self._get_response()
 
         if status != self.STATUS['success']:
-            if status == self.STATUS['key_exists']:
-                return False
-            elif status == self.STATUS['key_not_found']:
-                return False
-            elif status == self.STATUS['server_disconnected']:
+            if status in (self.STATUS['key_exists'], self.STATUS['key_not_found'],
+                          self.STATUS['server_disconnected'], self.STATUS['failure']):
                 return False
             raise MemcachedException('Code: %d Message: %s' % (status, extra_content), status)
 
@@ -786,11 +784,12 @@ class Protocol(threading.local):
 
         if status == self.STATUS['server_disconnected']:
             return False
-        if status != self.STATUS['success'] and status not in (self.STATUS['key_not_found'], self.STATUS['key_exists']):
+        if status not in (self.STATUS['success'], self.STATUS['key_not_found'],
+                          self.STATUS['key_exists'], self.STATUS['failure']):
             raise MemcachedException('Code: %d message: %s' % (status, extra_content), status)
 
         logger.debug('Key deleted %s', key)
-        return status != self.STATUS['key_exists']
+        return status == self.STATUS['success']
 
     def delete_multi(self, keys):
         """
