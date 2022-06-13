@@ -10,3 +10,6 @@ class AuthenticationNotSupported(MemcachedException):
 
 class InvalidCredentials(MemcachedException):
     pass
+
+class ServerDisconnected(MemcachedException):
+    pass

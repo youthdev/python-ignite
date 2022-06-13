@@ -14,7 +14,7 @@ import six
 from six import binary_type, text_type
 
 from bmemcached.compat import long
-from bmemcached.exceptions import AuthenticationNotSupported, InvalidCredentials, MemcachedException
+from bmemcached.exceptions import AuthenticationNotSupported, InvalidCredentials, MemcachedException, ServerDisconnected
 from bmemcached.utils import str_to_bytes
 import jsonpickle
 
@@ -288,7 +288,7 @@ class Protocol(threading.local):
          cas, extra_content) = self._get_response()
 
         if status == self.STATUS['server_disconnected']:
-            return False
+            raise ServerDisconnected('Server is disconnected', status)
 
         if status == self.STATUS['unknown_command']:
             logger.debug('Server does not requires authentication.')
@@ -315,7 +315,7 @@ class Protocol(threading.local):
          cas, extra_content) = self._get_response()
 
         if status == self.STATUS['server_disconnected']:
-            return False
+            raise ServerDisconnected('Server is disconnected', status)
 
         if status == self.STATUS['auth_error']:
             raise InvalidCredentials("Incorrect username or password", status)
@@ -414,7 +414,7 @@ class Protocol(threading.local):
                 return None, None
 
             if status == self.STATUS['server_disconnected']:
-                return None, None
+                raise ServerDisconnected('Server is disconnected', status)
 
             raise MemcachedException('Code: %d Message: %s' % (status, extra_content), status)
 
@@ -494,7 +494,7 @@ class Protocol(threading.local):
                 d[key] = self.deserialize(value, flags), cas
 
             elif status == self.STATUS['server_disconnected']:
-                break
+                raise ServerDisconnected('Server is disconnected', status)
             elif status != self.STATUS['key_not_found']:
                 raise MemcachedException('Code: %d Message: %s' % (status, extra_content), status)
 
@@ -540,8 +540,9 @@ class Protocol(threading.local):
          cas, extra_content) = self._get_response()
 
         if status != self.STATUS['success']:
-            if status in (self.STATUS['key_exists'], self.STATUS['key_not_found'],
-                          self.STATUS['server_disconnected'], self.STATUS['failure']):
+            if status == self.STATUS['server_disconnected']:
+                raise ServerDisconnected('Server is disconnected', status)
+            if status in (self.STATUS['key_exists'], self.STATUS['key_not_found'], self.STATUS['failure']):
                 return False
             raise MemcachedException('Code: %d Message: %s' % (status, extra_content), status)
 
@@ -678,8 +679,7 @@ class Protocol(threading.local):
             (magic, opcode, keylen, extlen, datatype, status, bodylen, opaque,
              cas, extra_content) = self._get_response()
             if status == self.STATUS['server_disconnected']:
-                # Assume that the entire operation failed.
-                return list(key for key, value in mappings)
+                raise ServerDisconnected('Server is disconnected', status)
             if status != self.STATUS['success']:
                 key, value = mappings[opaque]
                 if isinstance(key, tuple):
@@ -718,10 +718,10 @@ class Protocol(threading.local):
         (magic, opcode, keylen, extlen, datatype, status, bodylen, opaque,
          cas, extra_content) = self._get_response()
 
-        if status not in (self.STATUS['success'], self.STATUS['server_disconnected']):
-            raise MemcachedException('Code: %d Message: %s' % (status, extra_content), status)
         if status == self.STATUS['server_disconnected']:
-            return 0
+            raise ServerDisconnected('Server is disconnected', status)
+        if status != self.STATUS['success']:
+            raise MemcachedException('Code: %d Message: %s' % (status, extra_content), status)
 
         return struct.unpack('!Q', extra_content)[0]
 
@@ -783,7 +783,7 @@ class Protocol(threading.local):
          cas, extra_content) = self._get_response()
 
         if status == self.STATUS['server_disconnected']:
-            return False
+            raise ServerDisconnected('Server is disconnected', status)
         if status not in (self.STATUS['success'], self.STATUS['key_not_found'],
                           self.STATUS['key_exists'], self.STATUS['failure']):
             raise MemcachedException('Code: %d message: %s' % (status, extra_content), status)
@@ -828,7 +828,7 @@ class Protocol(threading.local):
             if status != self.STATUS['success']:
                 retval = False
             if status == self.STATUS['server_disconnected']:
-                break
+                raise ServerDisconnected('Server is disconnected', status)
 
         return retval
 
@@ -851,7 +851,9 @@ class Protocol(threading.local):
         (magic, opcode, keylen, extlen, datatype, status, bodylen, opaque,
          cas, extra_content) = self._get_response()
 
-        if status not in (self.STATUS['success'], self.STATUS['server_disconnected']):
+        if status == self.STATUS['server_disconnected']:
+            raise ServerDisconnected('Server is disconnected', status)
+        if status != self.STATUS['success']:
             raise MemcachedException('Code: %d message: %s' % (status, extra_content), status)
 
         logger.debug('Memcached flushed')
@@ -892,7 +894,7 @@ class Protocol(threading.local):
 
             status = response[5]
             if status == self.STATUS['server_disconnected']:
-                break
+                raise ServerDisconnected('Server is disconnected', status)
 
             keylen = response[2]
             bodylen = response[6]
