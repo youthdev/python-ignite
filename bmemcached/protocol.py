@@ -383,7 +383,7 @@ class Protocol(threading.local):
         else:
             return jsonpickle.decode(value)
 
-    def get(self, key):
+    def get(self, key, max_retry=5):
         """
         Get a key and its CAS value from server.  If the value isn't cached, return
         (None, None).
@@ -400,27 +400,35 @@ class Protocol(threading.local):
                            self.MAGIC['request'],
                            self.COMMANDS['get']['command'],
                            len(keybytes), 0, 0, 0, len(keybytes), 0, 0, keybytes)
-        self._send(data)
+        
+        while True:
+            self._send(data)
 
-        (magic, opcode, keylen, extlen, datatype, status, bodylen, opaque,
-         cas, extra_content) = self._get_response()
+            (magic, opcode, keylen, extlen, datatype, status, bodylen, opaque,
+             cas, extra_content) = self._get_response()
 
-        logger.debug('Value Length: %d. Body length: %d. Data type: %d',
-                     extlen, bodylen, datatype)
+            logger.debug('Value Length (max retry: %d): %d. Body length: %d. Data type: %d',
+                         max_retry, extlen, bodylen, datatype)
 
-        if status != self.STATUS['success']:
-            if status == self.STATUS['key_not_found']:
-                logger.debug('Key not found. Message: %s', extra_content)
-                return None, None
+            if status != self.STATUS['success']:
+                if status == self.STATUS['key_not_found']:
+                    logger.debug('Key not found. Message: %s', extra_content)
+                    return None, None
 
-            if status == self.STATUS['server_disconnected']:
-                raise ServerDisconnected('Server is disconnected', status)
+                if status == self.STATUS['server_disconnected']:
+                    # Do retry on server disconnected
+                    if max_retry <= 0:
+                        raise ServerDisconnected('Server is disconnected', status)
+                    else:
+                        # have to retry
+                        max_retry -= 1
+                        continue
 
-            raise MemcachedException('Code: %d Message: %s' % (status, extra_content), status)
+                raise MemcachedException('Code: %d Message: %s' % (status, extra_content), status)
 
-        flags, value = struct.unpack('!L%ds' % (bodylen - 4, ), extra_content)
+            flags, value = struct.unpack('!L%ds' % (bodylen - 4, ), extra_content)
 
-        return self.deserialize(value, flags), cas
+            return self.deserialize(value, flags), cas
 
     def noop(self):
         """
@@ -448,7 +456,7 @@ class Protocol(threading.local):
 
         return int(status)
 
-    def get_multi(self, keys):
+    def get_multi(self, keys, max_retry=5):
         """
         Get multiple keys from server.
 
@@ -479,33 +487,44 @@ class Protocol(threading.local):
                                command['command'],
                                len(keybytes), 0, 0, 0, len(keybytes), 0, 0, keybytes)
 
-        self._send(msg)
+        while True:
+            self._send(msg)
 
-        d = {}
-        opcode = -1
-        while opcode != self.COMMANDS['getk']['command']:
-            (magic, opcode, keylen, extlen, datatype, status, bodylen, opaque,
-             cas, extra_content) = self._get_response()
+            d = {}
+            opcode = -1
+            is_server_disconnected = False
+            while opcode != self.COMMANDS['getk']['command']:
+                (magic, opcode, keylen, extlen, datatype, status, bodylen, opaque,
+                 cas, extra_content) = self._get_response()
 
-            if status == self.STATUS['success']:
-                flags, key, value = struct.unpack('!L%ds%ds' %
-                                                  (keylen, bodylen - keylen - 4),
-                                                  extra_content)
-                d[key] = self.deserialize(value, flags), cas
+                if status == self.STATUS['success']:
+                    flags, key, value = struct.unpack('!L%ds%ds' %
+                                                      (keylen, bodylen - keylen - 4),
+                                                      extra_content)
+                    d[key] = self.deserialize(value, flags), cas
 
-            elif status == self.STATUS['server_disconnected']:
-                raise ServerDisconnected('Server is disconnected', status)
-            elif status != self.STATUS['key_not_found']:
-                raise MemcachedException('Code: %d Message: %s' % (status, extra_content), status)
+                elif status == self.STATUS['server_disconnected']:
+                    is_server_disconnected = True
+                    break
+                elif status != self.STATUS['key_not_found']:
+                    raise MemcachedException('Code: %d Message: %s' % (status, extra_content), status)
+            
+            # Do retry if the server is disconnected
+            if is_server_disconnected:
+                if max_retry <= 0:
+                    raise ServerDisconnected('Server is disconnected', status)
+                else:
+                    max_retry -= 1
+                    continue
 
-        ret = {}
-        for key in keys:
-            keybytes = str_to_bytes(key)
-            if keybytes in d:
-                ret[key] = d[keybytes]
-        return ret
+            ret = {}
+            for key in keys:
+                keybytes = str_to_bytes(key)
+                if keybytes in d:
+                    ret[key] = d[keybytes]
+            return ret
 
-    def _set_add_replace(self, command, key, value, time, cas=0):
+    def _set_add_replace(self, command, key, value, time, cas=0, max_retry=5):
         """
         Function to set/add/replace commands.
 
@@ -529,26 +548,33 @@ class Protocol(threading.local):
             value = value.encode('utf8')
 
         keybytes = str_to_bytes(key)
-        self._send(struct.pack(self.HEADER_STRUCT +
-                               self.COMMANDS[command]['struct'] % (len(keybytes), len(value)),
-                               self.MAGIC['request'],
-                               self.COMMANDS[command]['command'],
-                               len(keybytes), 8, 0, 0, len(keybytes) + len(value) + 8, 0, cas, flags,
-                               time, keybytes, value))
+        
+        while True:
+            self._send(struct.pack(self.HEADER_STRUCT +
+                                   self.COMMANDS[command]['struct'] % (len(keybytes), len(value)),
+                                   self.MAGIC['request'],
+                                   self.COMMANDS[command]['command'],
+                                   len(keybytes), 8, 0, 0, len(keybytes) + len(value) + 8, 0, cas, flags,
+                                   time, keybytes, value))
 
-        (magic, opcode, keylen, extlen, datatype, status, bodylen, opaque,
-         cas, extra_content) = self._get_response()
+            (magic, opcode, keylen, extlen, datatype, status, bodylen, opaque,
+             cas, extra_content) = self._get_response()
 
-        if status != self.STATUS['success']:
-            if status == self.STATUS['server_disconnected']:
-                raise ServerDisconnected('Server is disconnected', status)
-            if status in (self.STATUS['key_exists'], self.STATUS['key_not_found'], self.STATUS['failure']):
-                return False
-            raise MemcachedException('Code: %d Message: %s' % (status, extra_content), status)
+            if status != self.STATUS['success']:
+                if status == self.STATUS['server_disconnected']:
+                    # Do retry for set command
+                    if command != 'set' or max_retry <= 0:
+                        raise ServerDisconnected('Server is disconnected', status)
+                    else:
+                        max_retry -= 1
+                        continue
+                if status in (self.STATUS['key_exists'], self.STATUS['key_not_found'], self.STATUS['failure']):
+                    return False
+                raise MemcachedException('Code: %d Message: %s' % (status, extra_content), status)
 
-        return True
+            return True
 
-    def set(self, key, value, time):
+    def set(self, key, value, time, max_retry=5):
         """
         Set a value for a key on server.
 
@@ -561,7 +587,7 @@ class Protocol(threading.local):
         :return: True in case of success and False in case of failure
         :rtype: bool
         """
-        return self._set_add_replace('set', key, value, time)
+        return self._set_add_replace('set', key, value, time, max_retry=max_retry)
 
     def cas(self, key, value, cas, time):
         """
