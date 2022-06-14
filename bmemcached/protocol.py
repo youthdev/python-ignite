@@ -387,7 +387,7 @@ class Protocol(threading.local):
                            self.MAGIC['request'],
                            self.COMMANDS['get']['command'],
                            len(keybytes), 0, 0, 0, len(keybytes), 0, 0, keybytes)
-        
+
         while True:
             self._send(data, False)
 
@@ -417,7 +417,7 @@ class Protocol(threading.local):
 
             return self.deserialize(value, flags), cas
 
-    def noop(self):
+    def noop(self, max_retry=5):
         """
         Send a NOOP command
 
@@ -430,18 +430,29 @@ class Protocol(threading.local):
                            self.MAGIC['request'],
                            self.COMMANDS['noop']['command'],
                            0, 0, 0, 0, 0, 0, 0)
-        self._send(data, False)
 
-        (magic, opcode, keylen, extlen, datatype, status, bodylen, opaque,
-         cas, extra_content) = self._get_response()
+        while True:
+            self._send(data, False)
 
-        logger.debug('Value Length: %d. Body length: %d. Data type: %d',
-                     extlen, bodylen, datatype)
+            (magic, opcode, keylen, extlen, datatype, status, bodylen, opaque,
+             cas, extra_content) = self._get_response()
 
-        if status != self.STATUS['success']:
-            logger.debug('NOOP failed (status is %d). Message: %s' % (status, extra_content))
+            logger.debug('Value Length: %d. Body length: %d. Data type: %d',
+                         extlen, bodylen, datatype)
 
-        return int(status)
+            if status == self.STATUS['server_disconnected']:
+                # Do retry on server disconnected
+                if max_retry <= 0:
+                    raise ServerDisconnected('Server is disconnected', status)
+                else:
+                    logger.debug('Retrying because of server is disconnected (remaining: %d)...', max_retry)
+                    max_retry -= 1
+                    continue
+
+            if status != self.STATUS['success']:
+                logger.debug('NOOP failed (status is %d). Message: %s' % (status, extra_content))
+
+            return int(status)
 
     def get_multi(self, keys, max_retry=5):
         """
@@ -495,7 +506,7 @@ class Protocol(threading.local):
                     break
                 elif status != self.STATUS['key_not_found']:
                     raise MemcachedException('Code: %d Message: %s' % (status, extra_content), status)
-            
+
             # Do retry if the server is disconnected
             if is_server_disconnected:
                 if max_retry <= 0:
@@ -536,7 +547,7 @@ class Protocol(threading.local):
             value = value.encode('utf8')
 
         keybytes = str_to_bytes(key)
-        
+
         while True:
             self._send(struct.pack(self.HEADER_STRUCT +
                                    self.COMMANDS[command]['struct'] % (len(keybytes), len(value)),
