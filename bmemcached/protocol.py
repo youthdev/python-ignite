@@ -109,14 +109,10 @@ class Protocol(threading.local):
         self.socket_timeout = socket_timeout
         self.tls_context = tls_context
 
-        self.reconnects_deferred_until = None
-
         if not server.startswith('/'):
             self.host, self.port = self.split_host_port(self.server)
-            self.set_retry_delay(5)
         else:
             self.host = self.port = None
-            self.set_retry_delay(0)
 
     def __str__(self):
         return "{}_{}_{}".format(self.server, self._username, self._password)
@@ -125,18 +121,11 @@ class Protocol(threading.local):
     def server_uses_unix_socket(self):
         return self.host is None
 
-    def set_retry_delay(self, value):
-        self.retry_delay = value
-
     def _open_connection(self):
         if self.connection:
             return
 
         self.authenticated = False
-
-        # If we're deferring a reconnection attempt, wait.
-        if self.reconnects_deferred_until and self.reconnects_deferred_until > datetime.now():
-            return
 
         try:
             if self.host:
@@ -155,8 +144,6 @@ class Protocol(threading.local):
 
             self._send_authentication()
         except socket.error:
-            # If the connection attempt fails, start delaying retries.
-            self.reconnects_deferred_until = datetime.now() + timedelta(seconds=self.retry_delay)
             raise
 
     def _connection_error(self, exception):
