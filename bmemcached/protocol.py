@@ -407,8 +407,8 @@ class Protocol(threading.local):
             (magic, opcode, keylen, extlen, datatype, status, bodylen, opaque,
              cas, extra_content) = self._get_response()
 
-            logger.debug('Value Length (max retry: %d): %d. Body length: %d. Data type: %d',
-                         max_retry, extlen, bodylen, datatype)
+            logger.debug('Value Length: %d. Body length: %d. Data type: %d',
+                         extlen, bodylen, datatype)
 
             if status != self.STATUS['success']:
                 if status == self.STATUS['key_not_found']:
@@ -420,7 +420,7 @@ class Protocol(threading.local):
                     if max_retry <= 0:
                         raise ServerDisconnected('Server is disconnected', status)
                     else:
-                        # have to retry
+                        logger.debug('Retrying because of server is disconnected (remaining: %d)...', max_retry)
                         max_retry -= 1
                         continue
 
@@ -514,6 +514,7 @@ class Protocol(threading.local):
                 if max_retry <= 0:
                     raise ServerDisconnected('Server is disconnected', status)
                 else:
+                    logger.debug('Retrying because of server is disconnected (remaining: %d)...', max_retry)
                     max_retry -= 1
                     continue
 
@@ -566,6 +567,7 @@ class Protocol(threading.local):
                     if command != 'set' or max_retry <= 0:
                         raise ServerDisconnected('Server is disconnected', status)
                     else:
+                        logger.debug('Retrying because of server is disconnected (remaining: %d)...', max_retry)
                         max_retry -= 1
                         continue
                 if status in (self.STATUS['key_exists'], self.STATUS['key_not_found'], self.STATUS['failure']):
