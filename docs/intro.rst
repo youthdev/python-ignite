@@ -25,6 +25,8 @@ The main purpose of this module it to be able to communicate with memcached usin
 
 Latest compiled docs on Read The Docs `here <https://python-binary-memcached.readthedocs.org>`_.
 
+This library introduce an ability to auto retry for immutable commands (get/set/replace), so the lib will retry (default max retry = 5) on network problems.
+
 Installing
 ----------
 Use pip or easy_install.
