@@ -402,7 +402,7 @@ class Protocol(threading.local):
                            len(keybytes), 0, 0, 0, len(keybytes), 0, 0, keybytes)
         
         while True:
-            self._send(data)
+            self._send(data, False)
 
             (magic, opcode, keylen, extlen, datatype, status, bodylen, opaque,
              cas, extra_content) = self._get_response()
@@ -488,7 +488,7 @@ class Protocol(threading.local):
                                len(keybytes), 0, 0, 0, len(keybytes), 0, 0, keybytes)
 
         while True:
-            self._send(msg)
+            self._send(msg, False)
 
             d = {}
             opcode = -1
@@ -556,15 +556,16 @@ class Protocol(threading.local):
                                    self.MAGIC['request'],
                                    self.COMMANDS[command]['command'],
                                    len(keybytes), 8, 0, 0, len(keybytes) + len(value) + 8, 0, cas, flags,
-                                   time, keybytes, value))
+                                   time, keybytes, value),
+                       command not in ('set', 'replace'))
 
             (magic, opcode, keylen, extlen, datatype, status, bodylen, opaque,
              cas, extra_content) = self._get_response()
 
             if status != self.STATUS['success']:
                 if status == self.STATUS['server_disconnected']:
-                    # Do retry for set command
-                    if command != 'set' or max_retry <= 0:
+                    # Do retry for set/replace command
+                    if command not in ('set', 'replace') or max_retry <= 0:
                         raise ServerDisconnected('Server is disconnected', status)
                     else:
                         logger.debug('Retrying because of server is disconnected (remaining: %d)...', max_retry)
